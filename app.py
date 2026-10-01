@@ -33,7 +33,8 @@ def init_db():
         CREATE TABLE IF NOT EXISTS urls (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             original_url TEXT NOT NULL,
-            short_code TEXT NOT NULL UNIQUE
+            short_code TEXT NOT NULL UNIQUE,
+            clicks INTEGER DEFAULT 0
         )
     """)
 
@@ -47,7 +48,7 @@ def init_db():
         for column in columns
     ]
 
-    # Add clicks column if it doesn't exist
+    # Add clicks column if an older database doesn't have it
     if "clicks" not in column_names:
 
         connection.execute("""
@@ -93,26 +94,30 @@ def generate_unique_short_code():
         string.digits
     )
 
-    while True:
+    try:
 
-        short_code = ''.join(
-            secrets.choice(characters)
-            for _ in range(6)
-        )
+        while True:
 
-        existing = connection.execute("""
-            SELECT id
-            FROM urls
-            WHERE short_code = ?
-        """, (
-            short_code,
-        )).fetchone()
+            short_code = ''.join(
+                secrets.choice(characters)
+                for _ in range(6)
+            )
 
-        if existing is None:
+            existing = connection.execute("""
+                SELECT id
+                FROM urls
+                WHERE short_code = ?
+            """, (
+                short_code,
+            )).fetchone()
 
-            connection.close()
+            if existing is None:
 
-            return short_code
+                return short_code
+
+    finally:
+
+        connection.close()
 
 
 # ============================================================
@@ -183,28 +188,88 @@ def shorten_url():
 
     connection = get_db()
 
-    # ========================================================
-    # CHECK FOR EXISTING URL
-    # ========================================================
+    try:
 
-    existing = connection.execute("""
-        SELECT short_code
-        FROM urls
-        WHERE original_url = ?
-        LIMIT 1
-    """, (
-        original_url,
-    )).fetchone()
+        # Check for existing URL
+        existing = connection.execute("""
+            SELECT short_code
+            FROM urls
+            WHERE original_url = ?
+            LIMIT 1
+        """, (
+            original_url,
+        )).fetchone()
 
-    # ========================================================
-    # URL ALREADY EXISTS
-    # ========================================================
+        # URL already exists
+        if existing:
 
-    if existing:
+            short_code = existing["short_code"]
 
-        short_code = existing["short_code"]
+            short_url = (
+                request.host_url +
+                short_code
+            )
 
-        connection.close()
+            return jsonify({
+
+                "original_url":
+                    original_url,
+
+                "short_code":
+                    short_code,
+
+                "short_url":
+                    short_url,
+
+                "already_exists":
+                    True,
+
+                "message": (
+                    "This URL already exists. "
+                    "We've returned your existing short URL."
+                )
+
+            }), 200
+
+        # Generate new short code
+        characters = (
+            string.ascii_letters +
+            string.digits
+        )
+
+        while True:
+
+            short_code = ''.join(
+                secrets.choice(characters)
+                for _ in range(6)
+            )
+
+            existing_code = connection.execute("""
+                SELECT id
+                FROM urls
+                WHERE short_code = ?
+            """, (
+                short_code,
+            )).fetchone()
+
+            if existing_code is None:
+
+                break
+
+        # Insert URL
+        connection.execute("""
+            INSERT INTO urls (
+                original_url,
+                short_code,
+                clicks
+            )
+            VALUES (?, ?, 0)
+        """, (
+            original_url,
+            short_code
+        ))
+
+        connection.commit()
 
         short_url = (
             request.host_url +
@@ -213,61 +278,26 @@ def shorten_url():
 
         return jsonify({
 
-            "original_url": original_url,
+            "original_url":
+                original_url,
 
-            "short_code": short_code,
+            "short_code":
+                short_code,
 
-            "short_url": short_url,
+            "short_url":
+                short_url,
 
-            "already_exists": True,
+            "already_exists":
+                False,
 
-            "message": (
-                "This URL already exists. "
-                "We've returned your existing short URL."
-            )
+            "message":
+                "URL shortened successfully!"
 
-        }), 200
+        }), 201
 
-    # ========================================================
-    # CREATE NEW SHORT URL
-    # ========================================================
+    finally:
 
-    short_code = generate_unique_short_code()
-
-    connection.execute("""
-        INSERT INTO urls (
-            original_url,
-            short_code,
-            clicks
-        )
-        VALUES (?, ?, 0)
-    """, (
-        original_url,
-        short_code
-    ))
-
-    connection.commit()
-
-    connection.close()
-
-    short_url = (
-        request.host_url +
-        short_code
-    )
-
-    return jsonify({
-
-        "original_url": original_url,
-
-        "short_code": short_code,
-
-        "short_url": short_url,
-
-        "already_exists": False,
-
-        "message": "URL shortened successfully!"
-
-    }), 201
+        connection.close()
 
 
 # ============================================================
@@ -279,38 +309,40 @@ def redirect_to_original(short_code):
 
     connection = get_db()
 
-    result = connection.execute("""
-        SELECT original_url
-        FROM urls
-        WHERE short_code = ?
-    """, (
-        short_code,
-    )).fetchone()
+    try:
 
-    # Short code doesn't exist
-    if result is None:
+        result = connection.execute("""
+            SELECT original_url
+            FROM urls
+            WHERE short_code = ?
+        """, (
+            short_code,
+        )).fetchone()
+
+        # Short code doesn't exist
+        if result is None:
+
+            return "Short URL not found", 404
+
+        # Increase click count
+        connection.execute("""
+            UPDATE urls
+            SET clicks = clicks + 1
+            WHERE short_code = ?
+        """, (
+            short_code,
+        ))
+
+        connection.commit()
+
+        # Redirect
+        return redirect(
+            result["original_url"]
+        )
+
+    finally:
 
         connection.close()
-
-        return "Short URL not found", 404
-
-    # Increase click count
-    connection.execute("""
-        UPDATE urls
-        SET clicks = clicks + 1
-        WHERE short_code = ?
-    """, (
-        short_code,
-    ))
-
-    connection.commit()
-
-    connection.close()
-
-    # Redirect
-    return redirect(
-        result["original_url"]
-    )
 
 
 # ============================================================
@@ -322,48 +354,68 @@ def get_urls():
 
     connection = get_db()
 
-    results = connection.execute("""
-        SELECT
-            original_url,
-            short_code,
-            clicks
-        FROM urls
-        ORDER BY id DESC
-    """).fetchall()
+    try:
 
-    connection.close()
+        results = connection.execute("""
+            SELECT
+                id,
+                original_url,
+                short_code,
+                clicks
+            FROM urls
+            ORDER BY id DESC
+        """).fetchall()
 
-    urls = []
+        urls = []
 
-    for row in results:
+        for row in results:
 
-        urls.append({
+            urls.append({
 
-            "original_url":
-                row["original_url"],
+                "original_url":
+                    row["original_url"],
 
-            "short_code":
-                row["short_code"],
+                "short_code":
+                    row["short_code"],
 
-            "short_url":
-                request.host_url +
-                row["short_code"],
+                "short_url":
+                    request.host_url +
+                    row["short_code"],
 
-            "clicks":
-                row["clicks"]
+                "clicks":
+                    row["clicks"]
 
-        })
+            })
 
-    return jsonify(urls)
+        return jsonify(urls)
+
+    finally:
+
+        connection.close()
 
 
 # ============================================================
-# START APPLICATION
+# INITIALIZE DATABASE
+# ============================================================
+#
+# IMPORTANT:
+# This runs when Flask/Gunicorn imports this application.
+# It is required for deployment because Render starts the
+# application using:
+#
+#     gunicorn app:app
+#
+# In that situation __name__ is not "__main__".
+# ============================================================
+
+init_db()
+
+
+# ============================================================
+# START APPLICATION LOCALLY
 # ============================================================
 
 if __name__ == "__main__":
-
-    init_db()
 
     app.run(
         debug=True
