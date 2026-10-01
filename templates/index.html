@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0">
+
+    <title>Shortly - URL Shortener</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+
+<body>
+
+    <div class="container">
+
+        <!-- Header -->
+
+        <header class="header">
+
+            <div class="logo">
+                Shortly
+            </div>
+
+            <div class="status">
+                ● API Online
+            </div>
+
+        </header>
+
+
+        <!-- Main -->
+
+        <main>
+
+            <!-- Hero -->
+
+            <section class="hero">
+
+                <h1>
+                    Make your URL
+                    <span>shorter.</span>
+                </h1>
+
+                <p>
+                    Transform long URLs into short,
+                    easy-to-share links.
+                </p>
+
+            </section>
+
+
+            <!-- URL Shortener -->
+
+            <section class="shortener-card">
+
+                <form id="urlForm">
+
+                    <label for="url">
+                        Enter your long URL
+                    </label>
+
+
+                    <div class="input-container">
+
+                        <input
+                            type="url"
+                            id="url"
+                            placeholder="https://example.com/your-long-url"
+                            autocomplete="off"
+                            required
+                        >
+
+                        <button
+                            type="submit"
+                            id="shortenButton">
+
+                            Shorten URL
+
+                        </button>
+
+                    </div>
+
+                </form>
+
+
+                <!-- Notification -->
+
+                <div
+                    id="message"
+                    class="message hidden">
+                </div>
+
+
+                <!-- Result -->
+
+                <div
+                    id="result"
+                    class="result hidden">
+
+                    <div class="result-header">
+
+                        Your shortened URL
+
+                    </div>
+
+
+                    <div class="short-url-container">
+
+                        <a
+                            id="shortUrl"
+                            href="#"
+                            target="_blank"
+                            rel="noopener noreferrer">
+                        </a>
+
+
+                        <button
+                            id="copyButton"
+                            type="button">
+
+                            Copy
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+            </section>
+
+
+            <!-- Statistics -->
+
+            <section class="stats">
+
+                <div class="stat-card">
+
+                    <span class="stat-label">
+                        Total URLs
+                    </span>
+
+                    <strong id="totalUrls">
+                        0
+                    </strong>
+
+                </div>
+
+
+                <div class="stat-card">
+
+                    <span class="stat-label">
+                        Total Clicks
+                    </span>
+
+                    <strong id="totalClicks">
+                        0
+                    </strong>
+
+                </div>
+
+            </section>
+
+
+            <!-- URL History -->
+
+            <section class="history-card">
+
+                <div class="history-header">
+
+                    <div>
+
+                        <h2>
+                            URL History
+                        </h2>
+
+                        <p>
+                            Your recently shortened URLs
+                        </p>
+
+                    </div>
+
+
+                    <button
+                        id="refreshButton"
+                        class="refresh-button"
+                        type="button">
+
+                        Refresh
+
+                    </button>
+
+                </div>
+
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Original URL
+                                </th>
+
+                                <th>
+                                    Short URL
+                                </th>
+
+                                <th>
+                                    Clicks
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody id="urlTableBody">
+                        </tbody>
+
+                    </table>
+
+
+                    <div
+                        id="emptyState"
+                        class="empty-state">
+
+                        No shortened URLs yet.
+
+                    </div>
+
+                </div>
+
+            </section>
+
+        </main>
+
+
+        <!-- Footer -->
+
+        <footer>
+
+            Built with Flask + SQLite
+
+        </footer>
+
+    </div>
+
+
+    <script
+        src="{{ url_for('static', filename='app.js') }}">
+    </script>
+
+</body>
+
+</html>
